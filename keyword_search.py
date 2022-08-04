@@ -180,24 +180,25 @@ def scanFile(wordlist, folderName, entry, output):
         return results
     return ''
 
-def startScan(wordlist, target, output):
-    
-    def scanSingle(first_level):
-        for sub_entry in os.scandir(first_level):
-            if sub_entry.is_dir() and sub_entry.name != 'Keyword_Results':
-                print('[+] Searching folder: %s' % sub_entry.name)
-                for entry in scanTree(sub_entry.path):
+def scanSingle(first_level):
+        print(first_level)
+        for entry in os.scandir(first_level):
+            print(entry.name)
+            if entry.is_dir() and entry.name != 'Keyword_Results':
+                print('[+] Searching folder: %s' % entry.name)
+                for sub_entry in scanTree(entry.path):
                     try:
-                        if entry.is_file() and entry.stat().st_size <= 104857600: # only read files under 100mb:
+                        if sub_entry.is_file() and sub_entry.stat().st_size <= 104857600: # only read files under 100mb:
                             try:
-                                return scanFile(wordlist, sub_entry.name, entry, output)
+                                return scanFile(wordlist, entry.name, sub_entry, output)
                             except Exception as err:
-                                print('Error reading: %s' % entry.name)
+                                print('Error reading: %s' % sub_entry.name)
                                 print('Error text: %s' % str(err))
                                 pass
                     except Exception:
                         pass
                     
+def startScan(target):
     results = {
         'target': os.path.splitext(os.path.split(target)[1])[0],
         'data': []
@@ -206,13 +207,18 @@ def startScan(wordlist, target, output):
         for first_level in os.scandir(target):
             if first_level.is_dir():
                 print('Working in: %s' % first_level.name)
-                results['data'].extend(scanSingle(first_level.path))
+                data = scanSingle(first_level.path)
+                if data:
+                    results['data'].extend(data)
     else:
-        results['data'].extend(scanSingle(first_level.path))
+        data = scanSingle(target)
+        if data:
+            results['data'].extend(data)
         
     if results['data']:
         saveJson(results, output)
         saveHtml(results, output)
+        print('Process completed successfully!')
     else:
         print('\nProcess completed successfully but no keywords found in target folder(s)!')
 
@@ -221,7 +227,7 @@ def defineWordlist(wordFile):
         return kwdFile.read().splitlines()
 
 def main():
-    global depth
+    global depth, wordlist, output
     output = ''
     depth = 1
     for arg in sys.argv[1:]:
@@ -244,8 +250,7 @@ def main():
         print('keyword_search, v%s created by toys0ldier: github.com/toys0ldier' % verNum)
         print('\nLoaded %s keywords from wordlist: %s' % (len(wordlist), wordlistFile))
         print('Starting keyword search for target: %s\n' % os.path.split(target)[1])
-        startScan(wordlist, target, output)
-        print('Process completed successfully!')
+        startScan(target)
 
 if __name__ == '__main__':
     
