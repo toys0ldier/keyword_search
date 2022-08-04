@@ -1,5 +1,5 @@
 '''
-Usage: wordlist=[path/to/keyword_file] target=[path/to/search_directory] output=[path/to/output_directory] (optional)
+Usage: wordlist=[path/to/keyword_file] target=[path/to/search_directory] output=[path/to/output_directory] (optional) [d2] (optional)
 '''
 
 import os, shutil, html, sys, json, re
@@ -26,23 +26,33 @@ def formatSize(size):
 def saveHtml(results, output):
     fileOut = os.path.join(output, results['target'] + '.html')
     with open(fileOut + '_KeywordSearch.html', 'w') as outFile:
-        print('[+] Preparing output file and saving results for: %s' % results['target'])
+        print('\nPreparing output file and saving results for: %s' % results['target'])
         css = '''
-                <style>
-                body, table {
+            <style>
+                body {
                     font-family: "Helvetica", "Arial", sans-serif;
                     color: #51585a;
-                    font-size: 14px;
+                    font-size: 12px;
                     padding-top: 20px;
                     padding-left: 40px;
                     padding-right: 40px;
+                }
+                h3, h4 {
+                    text-align: center;
+                }
+                table {
+                    font-family: "Helvetica", "Arial", sans-serif;
+                    color: #51585a;
+                    font-size: 12px;
+                    table-layout: fixed;
                     width: 100%;
                 }
-                h3 h4 {
-                    margin: auto;
-                }
-                th td {
+                th, td {
                     text-align: left;
+                    word-wrap: break-word;
+                }
+                .meta-title {
+                    width: 7%;
                 }
                 .line {
                     width: 5%;
@@ -64,28 +74,56 @@ def saveHtml(results, output):
             '''
         outFile.write('<title>%s Keyword Search</title>' % results['target'])
         outFile.write(css)
+        outFile.write('<h3>Keyword Results for %s</h3>' % results['target'])
+        outFile.write('<h4>Generated: %s</h4>' % datetime.now().strftime('%Y-%m-%d %H:%M:%S CST'))
         for record in results['data']:
-                results = []
-                for result in record['results']:
-                    restat = '.{1,250}%s.{1,250}' % result['match']
-                    excerpt = re.search(restat, result['text'].lower())
+                record_data = []
+                for keyword_match in record['results']:
+                    restat = '.{1,250}%s.{1,250}' % keyword_match['match']
+                    excerpt = re.search(restat, keyword_match['text'].lower())
                     if excerpt:
-                        results.append({
-                            'line': result['line'],
-                            'match': result['match'],
-                            'text': re.sub(result['match'], '<span class="highlight-match">%s</span>' % result['match'], html.escape(excerpt[0]))
+                        record_data.append({
+                            'line': keyword_match['line'],
+                            'match': keyword_match['match'],
+                            'text': re.sub(keyword_match['match'], '<span class="highlight-match">%s</span>' % keyword_match['match'], html.escape(excerpt[0]))
                         })
-                if results:
+                if record_data:
                     relpath_list = os.path.normpath(record['filepath']).split(os.path.sep)
-                    relpath = relpath_list[relpath_list.index(results['target']) + 1:]
-                    outFile.write('<h3>Keyword Results for %s</h3>' % results['target'])
-                    outFile.write('<h4>Generated: %s</h5>' % datetime.now().strftime('%Y-%m-%d %H:%M:%S CST'))
-                    outFile.write('<span class="head">Filename:</span>&nbsp;%s<br />' % record['filename'])
-                    outFile.write('<span class="head">Filepath (Relative):</span>&nbsp;%s<br />' % relpath)
-                    outFile.write('<span class="head">File Size:</span>&nbsp;%s<br />' % formatSize(record['filesize']))
-                    outFile.write('<span class="head">Modified:</span>&nbsp;%s<br />' % datetime.fromtimestamp(record['mtime']).strftime('%Y-%m-%d %H:%M:%S'))
-                    outFile.write('<span class="head">Accessed:</span>&nbsp;%s<br />' % datetime.fromtimestamp(record['atime']).strftime('%Y-%m-%d %H:%M:%S'))
-                    outFile.write('<span class="head">Created:</span>&nbsp;%s<br />' % datetime.fromtimestamp(record['ctime']).strftime('%Y-%m-%d %H:%M:%S'))
+                    relpath = os.path.join(*relpath_list[relpath_list.index(results['target']) + 1:])
+                    fileMeta = '''
+                            <table>
+                                <tr>
+                                    <td class="meta-title"><span class="head">Filename:</span></td>
+                                    <td class="meta-data">&nbsp;%s</td>
+                                </tr>
+                                <tr>
+                                    <td class="meta-title"><span class="head">Filepath:</span></td>
+                                    <td class="meta-data">&nbsp;%s</td>
+                                </tr>
+                                <tr>
+                                    <td class="meta-title"><span class="head">File Size:</span></td>
+                                    <td class="meta-data">&nbsp;%s</td>
+                                </tr>
+                                <tr>
+                                    <td class="meta-title"><span class="head">Modified:</span></td>
+                                    <td class="meta-data">&nbsp;%s</td>
+                                </tr>
+                                <tr>
+                                    <td class="meta-title"><span class="head">Accessed:</span></td>
+                                    <td class="meta-data">&nbsp;%s</td>
+                                </tr>
+                                <tr>
+                                    <td class="meta-title"><span class="head">Created:</span></td>
+                                    <td class="meta-data">&nbsp;%s</td>
+                                </tr>
+                            </table>
+                    ''' % (record['filename'], 
+                           relpath, 
+                           formatSize(record['filesize']), 
+                           datetime.fromtimestamp(record['mtime']).strftime('%Y-%m-%d %H:%M:%S'),
+                           datetime.fromtimestamp(record['atime']).strftime('%Y-%m-%d %H:%M:%S'),
+                           datetime.fromtimestamp(record['ctime']).strftime('%Y-%m-%d %H:%M:%S'))
+                    outFile.write(fileMeta)
                     outFile.write('''<br />
                             <table>
                                 <tr>
@@ -93,7 +131,7 @@ def saveHtml(results, output):
                                     <th class="match">Match</th>
                                     <th class="text">Line Contents (500 Character Limit)</th>
                                 </tr>''')
-                    for r in results:
+                    for r in record_data:
                         outFile.write('''
                                         <tr>
                                             <td class="line">%s</td>
@@ -120,14 +158,15 @@ def scanFile(wordlist, folderName, entry, output):
     }
     with open(entry.path, 'r', encoding='utf-8-sig', errors='ignore') as f:
         lines = f.read().splitlines()
-        for i, line in enumerate(lines):
-            for word in wordlist:
-                if word.lower() in line.lower():
-                    data['results'].append({
-                        'line': i, 
-                        'match': word,
-                        'text': line if len(line) <= 10000 else line[0:10000]
-                    })
+        if lines:
+            for i, line in enumerate(lines):
+                for word in wordlist:
+                    if word.lower() in line.lower():
+                        data['results'].append({
+                            'line': i, 
+                            'match': word,
+                            'text': line if len(line) <= 10000 else line[0:10000]
+                        })
     if data['results']:
         results.append(data)
         try:
@@ -139,42 +178,57 @@ def scanFile(wordlist, folderName, entry, output):
             print('Failed to copy file: %s' % entry.path)
             pass
         return results
+    return ''
 
 def startScan(wordlist, target, output):
-    results = []
-    for first_level in os.scandir(target):
-        if first_level.is_dir():
-            print('Working in: %s' % first_level.name)
-            for sub_entry in os.scandir(first_level.path):
-                if sub_entry.is_dir():
-                    print('Active droplet: %s' % sub_entry.name)
-                    sub_results = {
-                        'target': sub_entry.name,
-                        'data': []
-                    }
-                    for entry in scanTree(sub_entry.path):
-                        try:
-                            if entry.is_file() and entry.stat().st_size <= 104857600: # only read files under 100mb:
-                                try:
-                                    sub_results['data'].extend(scanFile(wordlist, sub_entry.name, entry, output))
-                                except Exception as err:
-                                    print('Error reading: %s' % entry.name)
-                                    print('Error text: %s' % str(err))
-                                    pass
-                        except Exception:
-                            pass
-                    results.append(sub_results)
-                    saveHtml(sub_results, output)
-    saveJson(results, output)
+    
+    def scanSingle(first_level):
+        for sub_entry in os.scandir(first_level):
+            if sub_entry.is_dir() and sub_entry.name != 'Keyword_Results':
+                print('[+] Searching folder: %s' % sub_entry.name)
+                for entry in scanTree(sub_entry.path):
+                    try:
+                        if entry.is_file() and entry.stat().st_size <= 104857600: # only read files under 100mb:
+                            try:
+                                return scanFile(wordlist, sub_entry.name, entry, output)
+                            except Exception as err:
+                                print('Error reading: %s' % entry.name)
+                                print('Error text: %s' % str(err))
+                                pass
+                    except Exception:
+                        pass
+                    
+    results = {
+        'target': os.path.splitext(os.path.split(target)[1])[0],
+        'data': []
+    }
+    if depth == 2:
+        for first_level in os.scandir(target):
+            if first_level.is_dir():
+                print('Working in: %s' % first_level.name)
+                results['data'].extend(scanSingle(first_level.path))
+    else:
+        results['data'].extend(scanSingle(first_level.path))
+        
+    if results['data']:
+        saveJson(results, output)
+        saveHtml(results, output)
+    else:
+        print('\nProcess completed successfully but no keywords found in target folder(s)!')
 
 def defineWordlist(wordFile):
     with open(wordFile, 'r') as kwdFile:
         return kwdFile.read().splitlines()
 
 def main():
+    global depth
     output = ''
+    depth = 1
     for arg in sys.argv[1:]:
+        if arg == 'd2':
+            depth = 2
         if arg.startswith('wordlist='):
+            wordlistFile = arg.split('wordlist=')[1]
             wordlist = defineWordlist(arg.split('wordlist=')[1])
         if arg.startswith('target='):
             target = arg.split('target=')[1]
@@ -182,11 +236,18 @@ def main():
             output = arg.split('output=')[1]
     if not output:
         output = os.path.join(target, 'Keyword_Results')
+    else:
+        output = os.path.join(output, 'Keyword_Results')
+    if not os.path.exists(output):
         os.mkdir(output)
-    if wordlist and target:
+    if wordlist and os.path.isdir(target):
+        print('keyword_search, v%s created by toys0ldier: github.com/toys0ldier' % verNum)
+        print('\nLoaded %s keywords from wordlist: %s' % (len(wordlist), wordlistFile))
+        print('Starting keyword search for target: %s\n' % os.path.split(target)[1])
         startScan(wordlist, target, output)
-            
+        print('Process completed successfully!')
 
 if __name__ == '__main__':
     
+    verNum = '0.0.1b'
     main()
