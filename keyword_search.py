@@ -1,10 +1,19 @@
-'''
-Usage: wordlist=[path/to/keyword_file] target=[path/to/search_directory] output=[path/to/output_directory] (optional) [d2] (optional)
-'''
-
 import os, shutil, html, sys, json, re
 from datetime import datetime
 
+def showHelp():
+    print('''\nUsage: wordlist=[path/to/keyword_file] target=[path/to/search_directory]
+       output=[path_to/output_directory] (optional) [d2] (optional)''')
+    
+    print('\nAvailable flags:')
+    print('-h, --help                         ->   show this help message and exit')
+    print('wordlist=[path_to/keyword_file]    ->   keyword file (one keyword per line)')
+    print('target=[path_to/search_directory]  ->   folder containing items to be searched')
+    print('output=[path_to/output_directory   ->   folder to output results (optional')
+    print('d2                                 ->   depth of folder (optional, 1 if omitted)')
+        
+    sys.exit()
+    
 def scanTree(path):
     try:
         for entry in os.scandir(path):
@@ -230,6 +239,9 @@ def main():
     global depth, wordlist, output
     output = ''
     depth = 1
+    print('keyword_search, v%s created by toys0ldier: github.com/toys0ldier' % verNum)
+    if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+        showHelp()
     for arg in sys.argv[1:]:
         if arg == 'd2':
             depth = 2
@@ -247,7 +259,6 @@ def main():
     if not os.path.exists(output):
         os.mkdir(output)
     if wordlist and os.path.isdir(target):
-        print('keyword_search, v%s created by toys0ldier: github.com/toys0ldier' % verNum)
         print('\nLoaded %s keywords from wordlist: %s' % (len(wordlist), wordlistFile))
         print('Starting keyword search for target: %s\n' % os.path.split(target)[1])
         startScan(target)
