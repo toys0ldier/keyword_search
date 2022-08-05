@@ -1,6 +1,12 @@
 import os, shutil, html, sys, json, re
 from datetime import datetime
 
+class OperationError(Exception):
+    
+    def __init__(self, message="Whoops! We're missing some arguments!"):
+        self.message = message
+        super().__init__(self.message)
+        
 def showHelp():
     print('''\nUsage: wordlist=[path/to/keyword_file] target=[path/to/search_directory]
        output=[path_to/output_directory] (optional) [d2] (optional)''')
@@ -190,22 +196,24 @@ def scanFile(wordlist, folderName, entry, output):
     return ''
 
 def scanSingle(first_level):
-        print(first_level)
-        for entry in os.scandir(first_level):
-            print(entry.name)
-            if entry.is_dir() and entry.name != 'Keyword_Results':
-                print('[+] Searching folder: %s' % entry.name)
-                for sub_entry in scanTree(entry.path):
-                    try:
-                        if sub_entry.is_file() and sub_entry.stat().st_size <= 104857600: # only read files under 100mb:
-                            try:
-                                return scanFile(wordlist, entry.name, sub_entry, output)
-                            except Exception as err:
-                                print('Error reading: %s' % sub_entry.name)
-                                print('Error text: %s' % str(err))
-                                pass
-                    except Exception:
-                        pass
+    results = []
+    for entry in os.scandir(first_level):
+        if entry.is_dir() and entry.name != 'Keyword_Results':
+            print('[+] Searching folder: %s' % entry.name)
+            for sub_entry in scanTree(entry.path):
+                try:
+                    if sub_entry.is_file() and sub_entry.stat().st_size <= 104857600: # only read files under 100mb:
+                        try:
+                            data = scanFile(wordlist, entry.name, sub_entry, output)
+                            if data:
+                                results.extend(data)
+                        except Exception as err:
+                            print('Error reading: %s' % sub_entry.name)
+                            print('Error text: %s' % str(err))
+                            pass
+                except Exception:
+                    pass
+    return results
                     
 def startScan(target):
     results = {
@@ -214,7 +222,7 @@ def startScan(target):
     }
     if depth == 2:
         for first_level in os.scandir(target):
-            if first_level.is_dir():
+            if first_level.is_dir() and first_level.name != 'Keyword_Results':
                 print('Working in: %s' % first_level.name)
                 data = scanSingle(first_level.path)
                 if data:
@@ -237,7 +245,7 @@ def defineWordlist(wordFile):
 
 def main():
     global depth, wordlist, output
-    output = ''
+    output, wordlist, target = ('', '', '')
     depth = 1
     print('keyword_search, v%s created by toys0ldier: github.com/toys0ldier' % verNum)
     if sys.argv[1] == '-h' or sys.argv[1] == '--help':
@@ -245,13 +253,17 @@ def main():
     for arg in sys.argv[1:]:
         if arg == 'd2':
             depth = 2
-        if arg.startswith('wordlist='):
-            wordlistFile = arg.split('wordlist=')[1]
-            wordlist = defineWordlist(arg.split('wordlist=')[1])
-        if arg.startswith('target='):
-            target = arg.split('target=')[1]
-        if arg.startswith('output='):
-            output = arg.split('output=')[1]
+        if 'wordlist=' in arg:
+            wordlistFile = arg.split('=')[1]
+            wordlist = defineWordlist(arg.split('=')[1])
+        if 'target=' in arg:
+            target = arg.split('=')[1]
+        if 'output=' in arg:
+            output = arg.split('=')[1]
+    if not wordlist:
+        OperationError('No wordlist specified. Retry with the wordlist= flag and a path to your wordlist file!')
+    if not target:
+        OperationError('No target specified. Retry with the target= flag and a path to the folder to be searched!')
     if not output:
         output = os.path.join(target, 'Keyword_Results')
     else:
@@ -259,7 +271,7 @@ def main():
     if not os.path.exists(output):
         os.mkdir(output)
     if wordlist and os.path.isdir(target):
-        print('\nLoaded %s keywords from wordlist: %s' % (len(wordlist), wordlistFile))
+        print('\nLoaded %s keywords from wordlist: %s' % (len(wordlist), os.path.split(wordlistFile)[1]))
         print('Starting keyword search for target: %s\n' % os.path.split(target)[1])
         startScan(target)
 
