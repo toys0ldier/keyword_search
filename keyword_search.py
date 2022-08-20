@@ -94,14 +94,17 @@ def saveHtml(results, output):
         for record in results['data']:
                 record_data = []
                 for keyword_match in record['results']:
-                    restat = '.{1,250}%s.{1,250}' % keyword_match['match']
-                    excerpt = re.search(restat, keyword_match['text'].lower())
-                    if excerpt:
-                        record_data.append({
-                            'line': keyword_match['line'],
-                            'match': keyword_match['match'],
-                            'text': re.sub(keyword_match['match'], '<span class="highlight-match">%s</span>' % keyword_match['match'], html.escape(excerpt[0]))
-                        })
+                    try:
+                        restat = '.{1,250}%s.{1,250}' % keyword_match['match']
+                        excerpt = re.search(restat, keyword_match['text'].lower())
+                        if excerpt:
+                            record_data.append({
+                                'line': keyword_match['line'],
+                                'match': keyword_match['match'],
+                                'text': re.sub(keyword_match['match'], '<span class="highlight-match">%s</span>' % keyword_match['match'], html.escape(excerpt[0]))
+                            })
+                    except Exception:
+                        pass
                 if record_data:
                     relpath_list = os.path.normpath(record['filepath']).split(os.path.sep)
                     relpath = os.path.join(*relpath_list[relpath_list.index(results['target']) + 1:])
